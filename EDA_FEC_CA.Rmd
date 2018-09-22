@@ -1,0 +1,754 @@
+```{r echo=FALSE, message=FALSE, warning=FALSE, title}
+# ---
+# title: "EDA_FEC_CA"
+# author: "Arati Vaze"
+# date: "October 4, 2017"
+# output: html_document
+# ---
+```  
+# CA Contributions Analysis 
+#### by Arati Vaze
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+library(knitr)
+library(reshape2)
+library(GGally)
+library(dplyr)
+library(gridExtra)
+library(memisc)
+library(maps)
+library(ggplot2)
+```
+
+I chose the dataset "Financial Contributions to Presidential Campaigns by State" for my Exploratory Data Analysis Project. There, I chose year 2016 and California State.
+
+```{r echo=FALSE, include=FALSE, Load_the_Data}
+setwd("C:/Users/TS/Downloads/P00000001-CA")
+
+# My csv file had an extra comma at the end of each row except for the    header. I took care of this problem by excluding the header and reading rest of the rows from the csv to my dataframe CA. Then I excluded the last empty column from the dataframe. I then read the header row from the csv and assigned it as the column names to my dataframe CA.
+CA <- read.csv('P00000001-CA.csv', header = FALSE, sep = ",", skip = 1)
+CA$V19 <- NULL
+names(CA) <- read.csv('P00000001-CA.csv', header = FALSE, sep = ",",
+                      nrow = 1, stringsAsFactors=FALSE)
+
+# I created another column in the dataset CA, called "party". 
+# I assigned following variables to make my job easy :
+R <- c("Bush, Jeb", "Carson, Benjamin S.", "Christie, Christopher J.",
+       "Cruz, Rafael Edward 'Ted'", "Fiorina, Carly",
+       "Gilmore, James S III", "Graham, Lindsey O.", "Huckabee, Mike",
+       "Jindal, Bobby", "Kasich, John R.", "Pataki, George E.", "Paul, Rand",
+       "Perry, James R. (Rick)", "Rubio, Marco", "Santorum, Richard J.",
+       "Trump, Donald J.", "Walker, Scott")
+D <- c("Clinton, Hillary Rodham", "Lessig, Lawrence",
+       "O'Malley, Martin Joseph", "Sanders, Bernard",
+       "Webb, James Henry Jr.")
+L <- c("Johnson, Gary")
+I <- c("McMullin, Evan")
+G <- c("Stein, Jill")
+
+# Using these variables, the following code created the new column :
+CA$party <- ifelse(CA$cand_nm %in% R, "Republican", 
+                   ifelse (CA$cand_nm %in% D,  "Democratic", 
+                           ifelse(CA$cand_nm %in% L, "Libertarian",
+                                  ifelse(CA$cand_nm %in% I, "Independent", 
+                                         ifelse(CA$cand_nm %in% G, "Green", 
+                                                NA)))))
+
+# To convert the "party" variable into a categorical variable, I used the
+# factor function :
+CA$party <- factor(CA$party)
+
+# To explore the contribution dates further, I created a new variable that extracted the year and month from each date :
+CA$contb_year_month <- format(as.Date(CA$contb_receipt_dt, format = "%d-%b-%y"), "%y-%m")
+
+# I also created a variable that extracted the day from each date :
+CA$contb_receipt_day <- format(as.Date(CA$contb_receipt_dt,format="%d-%b-%y"), "%d")
+
+```
+
+# Univariate Plots Section
+
+Structure of the dataset :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Plots}
+str(CA)
+```
+
+List of candidates in the dataset :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+levels(CA$cand_nm)
+```
+
+Plot showing a count on each candidate in the data :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = cand_nm), data = CA) + geom_bar() +
+  theme(axis.text.x = element_text( angle = 90, size=10, face=2))
+```
+
+Political parties with their count in the dataset :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(CA$party)
+
+ggplot(aes(x = party), data = CA) + 
+  geom_bar(fill = c("#003399","#33FF00","#FF9933","#9933FF","#CC0033"), width = 0.5)
+```
+
+A look at the contribution amounts in dollars :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(CA$contb_receipt_amt)
+
+ggplot(aes(contb_receipt_amt), data = CA) + geom_histogram(binwidth = 10) +
+  coord_cartesian(xlim = c(-100,3000)) +
+  scale_x_continuous(breaks = seq(-100, 3000, 100)) +
+  theme(axis.text.x = element_text( angle = 45, size=10, face=2))
+```
+
+A closer look at the amounts most contributed :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(contb_receipt_amt), data = CA) + geom_histogram(binwidth = 1) +
+  coord_cartesian(xlim = c(0,100)) +
+  scale_x_continuous(breaks = seq(0, 100, 10))
+```
+
+This plot shows that there are spikes at dollars 25,50,100,10,5,15,27. People tend to contribute in such round numbers, though 27 is a surprise. I also see an interesting spike at 2700. There are 53 entries in the dataset with contribution 0.
+
+```{r echo=FALSE, include=FALSE, Trim_white_spaces}
+# I saw that a few contributor names had white spaces on their left. Just # to be cautious I trimmed the white spaces on both left and right sides.
+CA$contbr_nm <- factor(trimws(CA$contbr_nm, which = "both"))
+```
+
+These are the top 20 contributors whose names appear most in the dataset :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+head(sort(table(CA$contbr_nm), decreasing = T),20)
+```
+
+Top 20 cities appearing the most in the dataset :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+head(sort(table(CA$contbr_city), decreasing = T),20)
+```
+
+Top 20 employers of the contributors :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+head(sort(table(CA$contbr_employer), decreasing = T),30)
+```
+
+Top 20 occupations of the contributers :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+head(sort(table(CA$contbr_occupation), decreasing = T),20)
+```
+
+
+```{r echo=FALSE, include=FALSE, Three_more_variables}
+# Top 5 receipt descriptions appearing the most in the dataset :
+head(sort(table(CA$receipt_desc), decreasing = T),5)
+# Following table explores the variable memo_cd. The memo code "X" indicates that the reporting committee has provided additional text in the memo_text column to describe a specific contribution.
+table(CA$memo_cd)
+# I checked and found that many more entries have provided additional text :
+nrow(subset(CA, memo_cd == "" & memo_text != ""))
+```
+
+
+This distribution across contribution receipt months in the dataset shows that the number of contributions have peaks, one in March 2016 and then another in October 2016, the first one before primary elections and second one before general elections :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(contb_year_month), data = CA) + geom_bar() +
+  theme(axis.text.x = element_text( angle = 90, size=10, face=2))
+```
+
+This distribution along days shows that contributions are more towards end of month with a peak on the 29 th : 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(contb_receipt_day), data = CA) + geom_bar()
+```
+
+So I checked the top 20 dates when the contributions were highest :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+head(sort(table(CA$contb_receipt_dt), decreasing = T),20)
+```
+
+And it turns out that maximum number of contributions were received on the Leap Day - February 29, 2016.
+
+  
+Form Type indicates what schedule and line number the reporting committee reported a specific transaction :  
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = form_tp), data = CA) + geom_bar(width = 0.25)
+# SA17A:  Form 3P Schedule A Line 17A
+# SA18:   Form 3P Schedule A Line 18
+# SB28A:  Form 3P Schedule B Line 28A  
+```
+
+As can be seen from the plot and table below, highest number of contributions were towards the primary elections, followed by the general elections. P indicates Primary, G indicates General and O indicates Other:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = election_tp), data = CA) + geom_bar(width = 0.5)
+
+table(CA$election_tp)
+```
+
+
+# Univariate Analysis
+
+### What is the structure of your dataset?  
+The dataset I chose for my analysis came as a text file, comma delimited, and with double-quotation marks as the text qualifier. I converted it to a dataframe with 18 variables and 1304346 observations. All except 2 variables are categorical.  
+  
+The variables "cmte_id", "cand_id", "cand_nm" point to the 25 candidates who ran for the Presidential Elections in 2016. The "cmte_id" and "cand_id" are a 9-character alpha-numeric code assigned by the Federal Election Commission to the committee and candidate respectively.  
+  
+The variables "contbr_nm", "contbr_city", "contbr_st","contbr_zip", "contbr_employer", "contbr_occupation" provide information about the contributors.  
+  
+The variables "contb_receipt_amt", "contb_receipt_dt", "receipt_desc",  "memo_cd", "memo_text", "form_tp", "file_num", "tran_id", "election_tp" provide information about the contributions.
+
+### What is/are the main feature(s) of interest in your dataset?  
+The most significant information I found in the dataset was the contribution amount, and how it varies with the candidates.
+
+### What other features in the dataset do you think will help support \
+your investigation into your feature(s) of interest?  
+It was also interesting to find how the contribution amount varied with the contributor's city, contribution date and election type. I also looked into all the other interactions between all the features of the dataset to find any surprises and interesting connections.
+
+### Did you create any new variables from existing variables in the dataset?  
+I created a categorical variable "party", based on the candidates. The dataset has 25 candidates from 5 political parties. It does not have data about some candidates like Constitution Party's Darrell Castle, Party for Socialism and Liberation's Gloria La Riva.
+  
+I created variables "contb_year_month" that extracts year-month, and "contb_receipt_day" that extracts day of the month, from the contribution dates.
+
+I also created a variable "name" that merged the city name and the city state.
+
+### Of the features you investigated, were there any unusual distributions? \
+Did you perform any operations on the data to tidy, adjust, or change the form \
+of the data? If so, why did you do this?  
+I saw that a few contributor names had white spaces on their left. Just to be cautious I trimmed the white spaces on both left and right sides of all contributor names.
+
+The memo code "X" in the column "memo_cd" indicates that the reporting committee has provided additional text in the "memo_text"" column to describe a specific contribution. I checked to confirm and found that many more entries have provided additional text, even where there is no "X" as memo code. Also some entries that do have an "X", do not have any text in the "memo_text" column. I did not change anything there.
+
+I saw some unusual city names, some unusual zip codes.  
+
+I see that the dataset has 1304346 entries, so there should be that many unique transaction IDs, instead, there are 1300659. When I checked the entries that have common transaction IDs, I see that they are almost same except for any one of the columns that has some information entered differently. 
+
+# Bivariate Plots Section
+A plot showing candidate names per party :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(party, cand_nm), data = CA) + geom_point(aes(color = party)) +
+  theme(legend.position="none")
+```
+
+A plot showing distribution of candidates per election type :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(election_tp, cand_nm), data = CA) + geom_point()
+```
+
+Interesting facts seen here are :
+
+   +  All candidates except "McMullin, Evan" received contributions towards Primary 2016.
+   +  Only "Graham, Lindsay O." received contributions towards Primary 2020.
+   +  Only "Stein, Jill" received contributions towards O2016, which is Other elections 2016.
+   +  Few candidates received contributions with no election type indicated.
+   +  Although only 5 of these candidates were on the ballot for General elections, 16 candidates received contributions towards it. 
+
+
+Distribution of contribution amount received per party :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = contb_receipt_amt), data = CA) +
+  geom_freqpoly(binwidth = 50) +
+  facet_wrap(~party) +
+  coord_cartesian(xlim = c(-1000, 3000))
+```
+
+Instead of count, if I use density, which is proportion of count within 
+the group, I can see the distribution as follows :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = contb_receipt_amt, y = ..density..), data = CA) +
+  geom_freqpoly(binwidth = 50) +
+  facet_wrap(~party) +
+  coord_cartesian(xlim = c(-1000, 3000))
+```
+
+Summary of contribution amounts received per party :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+by(CA$contb_receipt_amt, CA$party, summary)
+```
+
+Total contribution amounts received per party :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+by(CA$contb_receipt_amt, CA$party, sum)
+```
+
+Total contribution amounts by top 20 cities :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+head(sort(by(CA$contb_receipt_amt, CA$contbr_city, sum), decreasing = T),20)
+```
+
+Total contribution amounts by top 20 contributors :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+head(sort(by(CA$contb_receipt_amt, CA$contbr_nm, sum), decreasing = T),20)
+```
+
+Total contribution amounts by contributors with top 20 employers :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+head(sort(by(CA$contb_receipt_amt, CA$contbr_employer, sum), decreasing = T),20)
+```
+
+Total contribution amounts by contributors with top 20 occupations :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+head(sort(by(CA$contb_receipt_amt, CA$contbr_occupation, sum), decreasing = T),20)
+```
+
+The top 20 frequent contributer employers and occupations appearing in the dataset are not necessarily the top 20 highest contributing, contributor employers and occupations.
+
+
+Total contribution amounts on the top 20 dates :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+head(sort(by(CA$contb_receipt_amt, CA$contb_receipt_dt, sum), decreasing = T),20)
+```
+
+So, although highest number of contributions were made on the Leap Day as mentioned earlier, the Day ranks 17th in terms of highest amount of contribution.
+
+
+Contribution amounts histograms by party :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+qplot(x = contb_receipt_amt, data = CA, binwidth = 100) +
+  facet_wrap(~party, scales = "free") +
+  coord_cartesian(xlim = c(-2000,5000)) 
+```
+
+Total contribution amounts received per candidate :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+sort(by(CA$contb_receipt_amt, CA$cand_nm, sum), decreasing = T)
+```
+
+```{r echo=FALSE, include=FALSE}
+# The file_num  is a unique number assigned to a report and all its 
+# associated transactions.  It links transactions to the report summaries 
+# (Form 3P)
+ggplot(aes(file_num), data = CA) + geom_histogram(binwidth = 1000) +
+  facet_wrap(~form_tp)
+# To see the number of contributions per city per candidate :
+by(CA$contbr_city, CA$cand_nm, summary)
+# or
+CA %>% group_by(cand_nm) %>% count(contbr_city)
+# Similarly, I checked the relation between other variables :
+by(CA$contbr_city, CA$party, summary)
+CA %>% group_by(party) %>% count(contbr_city)
+# and
+CA %>% group_by(contbr_occupation) %>% count(contbr_city)
+```
+
+The contribution mean and median for each political party, along with number of contributions for each party :
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots}
+CA_contb_by_party <- CA %>%
+  group_by(party)%>%
+  summarise(contb_mean = mean(contb_receipt_amt),
+            contb_median = median(contb_receipt_amt),
+            n = n())
+CA_contb_by_party
+```
+
+This plot shows the mean contribution for each party and the size of each dot is proportional to the number of contributions for that party :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = party, y = contb_mean), data = CA_contb_by_party) +
+  geom_point(aes(size = n), color = "#0033CC", pch = 16)
+```
+
+This plot shows the median contribution for each party and the size of each dot is proportional to the number of contributions for that party :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = party, y = contb_median), data = CA_contb_by_party) +
+  geom_point(aes(size = n), color = "#0099FF", pch = 16)
+```
+
+This plot shows the total amount of contribution received towards each type of election :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+CA_by_election_tp <- CA%>% group_by(election_tp) %>% 
+  summarise(sum_amt = sum(contb_receipt_amt), n = n())
+ggplot(aes(x = election_tp, y = sum_amt), data = CA_by_election_tp) +
+  geom_point(aes(size = n), pch = 16)
+```
+
+
+Earlier, in Univariate Plots we saw the number of contributions by year-month. Here I have added the feature "party" as color :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(contb_year_month), data = CA) + geom_bar(aes(fill = party)) +
+  theme(axis.text.x = element_text( angle = 90, size=10, face=2))
+```
+
+Top 50 highest contribution amounts received :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+high_contb <- head(sort(CA$contb_receipt_amt, decreasing = T), 50)
+high_contb
+```
+
+The above top 50 highest contribution amounts plotted against the respective candidates with the size of the dots indicating number of such contributions :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(aes(x = contb_receipt_amt, y = cand_nm),
+       data = subset(CA, contb_receipt_amt %in% high_contb)) +
+  geom_count(color = 'purple')
+```
+
+This plot shows that most of the top 50 highest contribution amounts in the dataset were received by "Ted Cruz".
+
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. How did the feature(s) of interest vary with other features in \
+the dataset?
+It was very interesting to see the features in light of the other features.
+
+In the Univariate section I had seen the general distribution of the contribution amounts in the dataset. In this Bivariate section I explored the contribution amounts with respect to cities, contributor occupations, their employers. I saw how the amount varies by dates, by election types. And of course it was interesting to see the amounts per party and also per candidate.
+
+### Did you observe any interesting relationships between the other features \
+(not the main feature(s) of interest)?  
+Not only the contribution amounts, I saw the candidates for different types of elections. I studied the relationships between contributor cities, contributor occupations and their employers. I saw the contributions for each candidate by dates.
+
+### What was the strongest relationship you found?
+I realized that when I explore the relationships between all the different features, it seems like there are innumerable angles of looking at the data. Each angle shows a new interesting fact about the data. For example, when I looked into the highest contribution amounts, I found out that most of those amounts were received by the Republican candidate Ted Cruz.
+
+# Multivariate Plots Section
+
+
+```{r echo=FALSE, include=FALSE}
+# I wanted to plot all the variables in the dataset CA against all other variables using ggpairs. However, most of these variables are factors with large number of levels. So I took a sample of levels of the variable contbr_city. Then I subset the dataset using that sample. I used the factor function on the variables of my choice and made a subset further. Then I used ggpairs on that subset :
+
+set.seed(66)
+sample_cities <- sample(levels(CA$contbr_city), 14)
+CA_subset <- subset(CA, CA$contbr_city %in% sample_cities)
+CA_subset$contbr_city <- factor(CA_subset$contbr_city)
+CA_subset$cand_nm <- factor(CA_subset$cand_nm)
+CA_subset$memo_cd <- factor(CA_subset$memo_cd)
+CA_subset$form_tp <- factor(CA_subset$form_tp)
+CA_subset$election_tp <- factor(CA_subset$election_tp)
+CA_subset$party <- factor(CA_subset$party)
+CA_ggpairs <- subset(CA_subset, select = c('cand_nm', 'contbr_city', 
+                                           'memo_cd', 'form_tp', 
+                                           'election_tp', 'party',
+                                           'contb_receipt_amt'))              
+ggpairs(CA_ggpairs[sample.int(nrow(CA_ggpairs), 100), ])
+```  
+
+
+A matrix of total contribution amounts plotted per month, for all the candidates.
+
+```{r echo=FALSE, fig.height=9, fig.width=9, Multivariate_Plots}
+# Here I cast and melt the dataset :
+CA_year_month <- dcast(CA, contb_year_month ~ cand_nm , 
+                       value.var = 'contb_receipt_amt',
+                       fun.aggregate = sum)
+names(CA_year_month) <- make.names(names(CA_year_month), unique = T)
+
+CA.melted <- melt(CA_year_month, id.vars = "contb_year_month")
+
+ggplot(aes(x = contb_year_month, y = value), data = CA.melted) +
+  geom_col(width = 0.5) +
+  theme(axis.text.x = element_text( angle = 90, size=6, face=2)) +
+  facet_wrap(~ variable, ncol = 3)
+```
+
+
+
+Plots of total contribution amounts plotted per month for the final five candidates on the ballot :
+
+```{r echo=FALSE, fig.width=9}
+g1 <- ggplot(aes(x = contb_year_month, y = Clinton..Hillary.Rodham), 
+       data = CA_year_month) + geom_col(fill = '#3399FF') +
+  theme(axis.text.x = element_text( angle = 90, size=8, face=2))
+g2 <- ggplot(aes(x = contb_year_month, y = Trump..Donald.J.), 
+             data = CA_year_month) + geom_col(fill = '#FF3000') +
+  theme(axis.text.x = element_text( angle = 90, size=8, face=2))
+g3 <- ggplot(aes(x = contb_year_month, y = Stein..Jill), 
+             data = CA_year_month) + geom_col(fill = '#33FF00') +
+  theme(axis.text.x = element_text( angle = 90, size=8, face=2))
+g4 <- ggplot(aes(x = contb_year_month, y = Johnson..Gary), 
+             data = CA_year_month) + geom_col(fill = '#FFFF00') +
+  theme(axis.text.x = element_text( angle = 90, size=8, face=2))
+g5 <- ggplot(aes(x = contb_year_month, y = McMullin..Evan), 
+             data = CA_year_month) + geom_col(fill = '#FF9933') +
+  theme(axis.text.x = element_text( angle = 90, size=8, face=2))
+grid.arrange(g1,g2,g3,g4,g5) 
+```
+
+
+Correlation matrix of total contribution amounts per city for the candidates :
+
+```{r echo=FALSE, fig.width=10, fig.height=8, message=FALSE, warning=FALSE}
+# Here I cast the original dataset and got a dataframe where variables are the candidates with total contribution amounts per city as values and a variable with contributor cities as value.
+CA_city <- dcast(CA, contbr_city ~ cand_nm , 
+                       value.var = 'contb_receipt_amt',
+                       fun.aggregate = sum)
+names(CA_city) <- make.names(names(CA_city), unique = T)
+# Then I plotted the correlation matrix for the variables :
+ggcorr(CA_city, label = TRUE, label_size = 3, label_round = 2, 
+       label_alpha = TRUE, hjust = 0.9, layout.exp = 3)
+```
+
+The pairs of candidates having a correlation coefficient close to 1 must be popular in common cities.
+
+
+
+Plot of year-month against candidates plotting total contributions, with negative amounts indicating refunds, etc. : 
+
+```{r echo=FALSE, fig.width=9, message=FALSE, warning=FALSE}
+ggplot(aes(x = contb_year_month, y = cand_nm), data = CA) +
+  geom_point(aes(color=ifelse(contb_receipt_amt > 0,"purple","orange"))) +
+  theme(axis.text.x = element_text( angle = 90, size=10, face=2)) +
+  scale_color_discrete(name = "Contribution Amount",
+                       labels=c("Negative", "Positive"))
+```
+
+One can read from this plot, which month a candidate started campaign, and when ended.
+
+
+This plot shows contribution amounts per month for each political party :
+
+```{r echo=FALSE, fig.width=9, message=FALSE, warning=FALSE}
+ggplot(aes(x = contb_year_month, y = contb_receipt_amt, fill = party), 
+       data = CA) +
+  geom_bar(stat = 'identity', position = 'stack', width = 0.5) +
+  theme(axis.text.x = element_text( angle = 90, size=10, face=2))
+```
+
+
+Scatterplot for samples :
+
+There are 2534 cities in this dataset. By taking samples of all the cities in the dataset, we can look at various distributions : 
+
+```{r echo=FALSE, include=FALSE} 
+set.seed(19)
+sample.cities <- sample(levels(CA$contbr_city), 16)
+
+ggplot(aes(party, contb_receipt_amt),
+       data = subset(CA, contbr_city %in% sample.cities)) +
+  facet_wrap(~contbr_city) +
+  geom_point() +
+  theme(axis.text.x = element_text( angle = 45, size=8, face=2))
+ggplot(aes(party, cand_nm),
+       data = subset(CA, contbr_city %in% sample.cities)) +
+  facet_wrap(~contbr_city) +
+  geom_point(aes(size = contb_receipt_amt), pch = 16) +
+  theme(axis.text.x = element_text( angle = 45, size=8, face=2))
+```
+
+
+```{r echo=FALSE, fig.width=8, fig.height=8, message=FALSE, warning=FALSE}
+set.seed(3)
+sample.cities <- sample(levels(CA$contbr_city), 16)
+
+ggplot(aes(party, contb_receipt_amt),
+       data = subset(CA, contbr_city %in% sample.cities)) +
+  facet_wrap(~contbr_city) +
+  geom_point() +
+  theme(axis.text.x = element_text( angle = 45, size=8, face=2))
+```
+
+
+```{r echo=FALSE, fig.width=8, fig.height=8, message=FALSE, warning=FALSE}
+ggplot(aes(party, cand_nm),
+       data = subset(CA, contbr_city %in% sample.cities)) +
+  facet_wrap(~contbr_city) +
+  geom_point(aes(size = contb_receipt_amt), pch = 16) +
+  theme(axis.text.x = element_text( angle = 45, size=8, face=2)) +
+  labs(size = "Contribution")
+```
+
+
+A HeatMap of year-months versus candidates showing distribution of contribution amounts with different colors and shades :
+
+```{r echo=FALSE, fig.width=8, message=FALSE, warning=FALSE}
+# HeatMap
+ggplot(aes(y = cand_nm, x = contb_year_month, fill = contb_receipt_amt),
+       data = CA) +
+  geom_tile() +
+  scale_fill_gradientn(colors = colorRampPalette(c('blue', 'red'))(100)) +
+  theme(axis.text.x = element_text(angle = 90, size=8, face=2))
+```
+
+
+I have built a linear model for the contribution amount based on party and contribution receipt day from the data :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1 <- lm(contb_receipt_amt ~ party, data = CA)
+m2 <- update(m1, ~ . + contb_receipt_day)
+mtable(m1, m2)
+```
+
+Based on this model, estimated contribution amount for Green Party  without considering the receipt day would be (103.84 + 160.69), and considering receipt day would be (92.49 + 157.51 + 2.17) for second day of a month. For Republican Party, the contribution amount without considering receipt day would be (103.84 + 75.78), and considering receipt day would be (92.49 + 76.15 - 1.07) for tenth day of a month. Low R-squared value of 0.006 indicates a bad correlation between the variables.
+
+
+
+Next I have plotted those cities in my dataset that have population greater than about 40,000, on the map of California. I have colored the cities by the party that got the most number of contributions :
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+data(us.cities)
+# This database is of USA cities of population greater than about 40,000. It has longitude and latitude values for those cities. If I merge this database with my dataset, I can plot those cities on a map of California.
+# This database has city names somewhat different from the city names in my dataset. This database has city name and state name in a single column called name. My dataset has city name in one column and state California in another column. 
+# So I need to paste the two columns and also change the values to lower case in my dataset :
+CA$name <- tolower(paste(CA$contbr_city, CA$contbr_st))
+# In case of the database us.cities, I need to change the values to lower case :
+us.cities$name <- tolower(us.cities$name)
+# Now they are ready for a merge on the column 'name' :  
+CA.cities <- merge(us.cities, CA, by = "name")
+# This new dataframe has columns from both the datasets.
+
+# Now to plot the map of California, I shall create a dataframe from the data in the maps package :
+all_states <- map_data("state")
+# I shall take a subset of this dataframe :
+state <- subset(all_states, region == "california")
+# I want to plot the cities on my map and color them by party that got the most number of contributions. Hence I form this tibble :
+CA.major <- CA.cities %>% group_by(name) %>% 
+  summarise(majority = names(sort(table(party), 
+                                      decreasing = T))[1])
+# When I merge this tibble and my earlier dataframe CA.cities, I add a new column indicating the majority party for each city :
+CA.cities_major <- merge(CA.cities, CA.major, by = "name")
+# Now I can plot some of the cities in my dataset on the map of California and also color the cities based on political party that got highest contributions from that city :
+ggplot() + geom_polygon( data=state, aes(x=long, y=lat, group = group),
+                         colour="white", fill="grey10" ) +
+  geom_point(data=CA.cities_major, aes(x=long, y=lat, color=majority))
+```
+
+How many cities with population greater than about 40,000 , contributed most to each party ?
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+table(CA.major$majority)
+```
+
+So, out of the 203 cities with population greater than about 40,000 , 198 cities contributed mostly to the Democratic party and 5 cities contributed mostly to the Republican party. The other three parties received less number of contributions than these two.
+
+This made me curious about all the cities in the dataset. How many cities contributed most to each party ?
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+CA.major_main <- CA %>% group_by(contbr_city) %>%
+  summarise(majority = names(sort(table(party), 
+                                  decreasing = T))[1])
+
+table(CA.major_main$majority)
+```
+
+Here we see an interesting fact. When we include the cities with population less than about 40,000 , we have more cities contributing most to the Republican party than the Democratic party. And some of the cities with less than 40,000 population gave most contributions to the other three parties too.
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. Were there features that strengthened each other in terms of \
+looking at your feature(s) of interest?
+It became more interesting when I started to look at 2 features in relation to a 3rd or even 4th feature.   
+
+For example by plotting the year-month versus the candidates, I could see when a particular candidate started and ended the campaign. But when I added a third feature, and colored the plot with total contribution amount per month, I could further see the negative amounts which meant that there were mostly refunds or transfers in those particular months.  
+
+Another example would be the California Map I plotted. For this I borrowed data about the longitudes, latitudes of the cities and the state. Then I plotted the selected highly populated cities and colored them according to the party that received highest number of contributions from that city.  
+
+When I plotted scatterplots for sample cities, I plotted the party versus candidates for each city, and plotted the points by size of the fourth feature, contribution amount.  
+ 
+### Were there any interesting or surprising interactions between features?
+I was surprised to see that highly populated cities contributed highest to mainly the Democratic party and somewhat to the Republican party, whereas, less populated cities contributed highest to mainly the Republican party, next to Democratic party and also somewhat to the other 3 parties.
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the \
+strengths and limitations of your model.
+I built a linear model for the contribution amount based on party and contribution receipt day from the data. It is a huge data with mostly categorical variables with lots of levels. Hence I could not add any more variables. I believe the model can become a little stronger if I can add contribution city. I might also try borrowing county data and managing the large number of cities by gathering them into counties. My model was not a strong model looking at the low R-squared value of 0.006.
+
+------
+
+# Final Plots and Summary
+
+
+### Plot One
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_One}
+ggplot(aes(contb_year_month), data = CA) + geom_bar(aes(fill = party)) +
+  theme(axis.text.x = element_text( angle = 90, size=10, face=2)) +
+  xlab("Contribution Year-Month") +
+  ylab("Number of Contributions") +
+  ggtitle("Distribution of Contributions per Year-Month per Party") +
+  theme(plot.title = element_text(face="bold"))
+```
+
+
+### Description One
+I plotted this distribution in both Univariate and Bivariate sections. In the Univariate plot I could see the number of contributions per year-month and as I mentioned there, I could see 2 peaks, one in March 2016, and another in October 2016. But in the Bivariate plot, I can see that, this is true only for the Democratic Party. For the Republican Party, the peaks are in February 2016 and July 2016. This information was hidden in the Univariate Plot. 
+
+### Plot Two
+```{r echo=FALSE, fig.width=9, message=FALSE, warning=FALSE, Plot_Two}
+ggplot(aes(x = contb_year_month, y = cand_nm), data = CA) +
+  geom_point(aes(color=ifelse(contb_receipt_amt > 0,"purple","orange"))) +
+  theme(axis.text.x = element_text( angle = 90, size=10, face=2)) +
+  scale_color_discrete(name = "Contribution Amount",
+                       labels=c("Negative", "Positive")) +
+  xlab("Contribution Year-Month") +
+  ylab("Candidate") +
+  ggtitle("Contributions by Candidates, Received and Refunded") +
+  theme(plot.title = element_text(face="bold"))
+```
+
+### Description Two
+I find this plot very meaningful. First of all, it shows the length of each candidate's campaign. The dots show which month a candidate's contribution campaign began and when it ended. Furthermore, the color of the dots shows whether the contributions for a month were effectively received, seen as positive dots, or refunded, seen as negative dots.  
+
+For example, Bernie Sanders started his contribution campaign in May 2015 and ended in December 2016. During this time his total contribution for August, September, October and December 2016 was zero or negative, which was after he endorsed Hillary Clinton in July. Although, I wonder why he had zero or negative contributions in July, August and September 2015.  
+
+As a different example, Richard Santorum started his contribution campaign in May 2015 and ended in December 2016. His total contributions for all these months is positive. I wonder why he received contributions even after he ended his Presidential campaign in February 2016.  
+
+The plot points towards further analysis.
+  
+### Plot Three
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_Three}
+ggplot() + geom_polygon( data=state, aes(x=long, y=lat, group = group),
+                         colour="white", fill="grey10" ) +
+  geom_point(data=CA.cities_major, aes(x=long, y=lat, color=majority)) +
+  xlab("Latitude in degrees") +
+  ylab("Longitude in degrees") +
+  ggtitle("Highly Populated California cities, by party with majority contributions") +
+  theme(plot.title = element_text(face="bold"))
+```
+
+
+
+### Description Three
+I was able to get the Latitudes and Longitudes of cities with population greater than about 40,000 from the package "maps". I combined that information with my dataset and was able to plot those cities on the map of California.
+  
+For each city I got a count on each political party. For each city I found the party that received highest number of contributions. I colored the cities on the map based on the political party that received the highest number of contributions from that city. I plotted the highly populated 203 cities, out  of which 198 contributed __mostly__ to the Democratic Party and 5 to the Republican Party.
+  
+If I had plotted all of the 2534 cities from my dataset, the colors on the map would have looked different. 1335 cities contributed __mostly__ to the Republican Party, 1169 to the Democratic Party, 16 to the Green Party, 13 to the Libertarian Party and 1 to the Independent Party.    
+
+
+# Reflection
+
+Working on this dataset was a delight.
+  
+The 2016 Presidential elections were fairly recent. Getting to know the campaign finances in depth was very insightful.
+  
+When I started, I had a rough idea of what I was going to analyze. As I explored, I began to see the power of Exploratory Data Analysis. I learned about the possibilities of looking at the data from different angles. 
+  
+I had starting trouble because my csv file would not convert to dataframe as I would like it to. Eventually I figured out the right way. 
+  
+Many times it so happened that I would want to plot certain features, but realized that the plots turned out to be too cluttered. Then I had to find a way out, sometimes by taking samples, sometimes by clustering the data. Even then, the patterns I could see in the plots encouraged me to look for more. 
+  
+Some times it seemed easy to jump to conclusions, but I recognised the flaw in doing so. Deducing from plots is very powerful only if it is done right. Otherwise it can simply give wrong results.
+  
+I would suggest that the dataset should add the contributor's gender and age. That information would help in making the linear model better.
+  
+This dataset is useful in getting an insight for future election campaigns. Without looking at the individual candidates, the contributions received by each party from the beginning of the campaign period shows the inclination of different cities. Of course, the individual candidates come next and are as important. The dataset shows the inclination of people from various occupations. It also shows the timeline of contributions which can be helpful.
+
